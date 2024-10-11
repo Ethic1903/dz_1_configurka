@@ -7,7 +7,7 @@ class Emulator:
         self.load_config(config_path)
         self.current_dir = "/"
         self.file_structure = {}
-        self.new_directories = set()  # Хранит новые директории, созданные во время работы эмулятора
+        self.new_directories = set()
         self.load_virtual_fs()
         self.execute_startup_script()
 
@@ -18,43 +18,36 @@ class Emulator:
             self.startup_script = config['startup_script']
 
     def load_virtual_fs(self):
-        """Загружает виртуальную файловую систему из tar-архива в память"""
         with tarfile.open(self.tar_path, 'r') as tar:
             for member in tar.getmembers():
                 self.file_structure[member.name] = member
 
     def execute_startup_script(self):
-        """Выполняет команды из стартового скрипта"""
         if os.path.exists(self.startup_script):
             with open(self.startup_script, 'r') as script:
                 for command in script:
                     self.run_command(command.strip())
 
     def cd(self, path):
-        """Изменяет текущую директорию"""
         if path == "/":
             self.current_dir = "/"
             return
 
         new_path = os.path.normpath(os.path.join(self.current_dir, path)).strip("/")
 
-        # Проверяем существующие директории в архиве
         if new_path in self.file_structure and self.file_structure[new_path].isdir():
             self.current_dir = "/" + new_path
-        # Проверяем новые директории, созданные во время работы
         elif new_path in self.new_directories:
             self.current_dir = "/" + new_path
         else:
             print(f"cd: {path}: No such directory")
 
     def ls(self):
-        """Выводит содержимое текущей директории"""
         current_dir_content = [
             os.path.basename(member)
             for member in self.file_structure
             if os.path.dirname(member).strip("/") == self.current_dir.strip("/")
         ]
-        # Добавляем новые директории в список содержимого
         current_dir_content.extend([
             os.path.basename(new_dir)
             for new_dir in self.new_directories
@@ -67,16 +60,15 @@ class Emulator:
             print("(empty)")
 
     def mkdir(self, dirname):
-        """Создает новую директорию (в памяти)"""
-        new_dir = os.path.normpath(os.path.join(self.current_dir, dirname)).strip("/")
+        new_dir = os.path.normpath(os.path.join(self.current_dir, dirname)).replace('\\', '/').strip("/")
         if new_dir in self.file_structure or new_dir in self.new_directories:
             print(f"mkdir: cannot create directory '{dirname}': File exists")
         else:
-            self.new_directories.add(new_dir)  # Добавляем в набор новых директорий
+            self.new_directories.add(new_dir)
             print(f"Directory '{dirname}' created")
 
     def rev(self, filename):
-        """Читает файл и выводит его содержимое в обратном порядке"""
+        filename = filename.replace('\\', '/')
         filepath = os.path.normpath(os.path.join(self.current_dir, filename)).strip("/")
         if filepath in self.file_structure and self.file_structure[filepath].isfile():
             with tarfile.open(self.tar_path, 'r') as tar:
@@ -86,7 +78,6 @@ class Emulator:
             print(f"rev: {filename}: No such file")
 
     def run_command(self, command):
-        """Обрабатывает команды, введенные пользователем"""
         if command == "exit":
             return False
         elif command.startswith("cd"):
@@ -114,13 +105,11 @@ class Emulator:
         return True
 
     def run(self):
-        """Запускает основной цикл эмулятора"""
         while True:
             command = input(f"{self.current_dir} $ ")
             if not self.run_command(command):
                 break
 
-# Пример использования
 if __name__ == "__main__":
     config_path = "/mnt/c/Users/georgiyf/PycharmProjects/shell_emulator/config_1.json"
     emulator = Emulator(config_path)
